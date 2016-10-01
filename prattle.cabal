@@ -1,0 +1,12 @@
+Name:           prattle
+Version:        0.0
+Cabal-Version:  >= 1.2
+License:        GPL3
+Author:         Nathan Bloomfield
+Synopsis:       Generate Random Text
+Build-Type:     Simple
+
+Executable prattle
+  main-is:        Main.hs
+  hs-source-dirs: src/
+  build-depends:  base
