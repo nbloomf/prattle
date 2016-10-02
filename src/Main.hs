@@ -4,6 +4,7 @@ import Test.QuickCheck
 import Data.Time
 import Data.List
 import System.Environment (getArgs)
+import System.Locale
 
 main :: IO ()
 main = do
@@ -33,6 +34,8 @@ instance ToXML WP_Blog where
   to_xml x = unlines
     [ header
     , "<channel>"
+    , "<wp:base_site_url>http://example.com</wp:base_site_url>"
+    , "<wp:base_blog_url>http://example.com</wp:base_blog_url>"
     , "<wp:wxr_version>1.2</wp:wxr_version>"
     , concatMap to_xml (wp_blog_posts x)
     , "</channel>"
@@ -98,17 +101,17 @@ instance ToXML WP_Comment where
   to_xml x = unlines
     [ "  <wp:comment>"
     , "    <wp:comment_id>" ++ wp_comment_id x ++ "</wp:comment_id>"
-    , "    <wp_comment_author>" ++ cdata (wp_comment_author x) ++ "</wp:comment_author>"
-    , "    <wp_comment_author_url>" ++ cdata (wp_comment_author_url x) ++ "</wp:comment_author_url>"
-    , "    <wp_comment_author_email>" ++ cdata (wp_comment_author_email x) ++ "</wp:comment_author_email>"
-    , "    <wp_comment_author_IP>" ++ cdata (wp_comment_author_IP x) ++ "</wp:comment_author_IP>"
-    , "    <wp_comment_date>" ++ cdata (wp_comment_date x) ++ "</wp:comment_date>"
-    , "    <wp_comment_date_gmt>" ++ cdata (wp_comment_date_gmt x) ++ "</wp:comment_date_gmt>"
-    , "    <wp_comment_content>" ++ cdata (wp_comment_content x) ++ "</wp:comment_content>"
-    , "    <wp_comment_approved>" ++ cdata (wp_comment_approved x) ++ "</wp:comment_approved>"
-    , "    <wp_comment_type>" ++ cdata (wp_comment_type x) ++ "</wp:comment_type>"
-    , "    <wp_comment_parent>" ++ (wp_comment_parent x) ++ "</wp:comment_parent>"
-    , "    <wp_comment_user_id>" ++ (wp_comment_user_id x) ++ "</wp:comment_user_id>"
+    , "    <wp:comment_author>" ++ cdata (wp_comment_author x) ++ "</wp:comment_author>"
+    , "    <wp:comment_author_url>" ++ cdata (wp_comment_author_url x) ++ "</wp:comment_author_url>"
+    , "    <wp:comment_author_email>" ++ cdata (wp_comment_author_email x) ++ "</wp:comment_author_email>"
+    , "    <wp:comment_author_IP>" ++ cdata (wp_comment_author_IP x) ++ "</wp:comment_author_IP>"
+    , "    <wp:comment_date>" ++ cdata (wp_comment_date x) ++ "</wp:comment_date>"
+    , "    <wp:comment_date_gmt>" ++ cdata (wp_comment_date_gmt x) ++ "</wp:comment_date_gmt>"
+    , "    <wp:comment_content>" ++ cdata (wp_comment_content x) ++ "</wp:comment_content>"
+    , "    <wp:comment_approved>" ++ cdata (wp_comment_approved x) ++ "</wp:comment_approved>"
+    , "    <wp:comment_type>" ++ cdata (wp_comment_type x) ++ "</wp:comment_type>"
+    , "    <wp:comment_parent>" ++ (wp_comment_parent x) ++ "</wp:comment_parent>"
+    , "    <wp:comment_user_id>" ++ (wp_comment_user_id x) ++ "</wp:comment_user_id>"
     , "  </wp:comment>"
     ]
 
@@ -118,24 +121,24 @@ wp_posts n = sequence $ map wp_post [1..n]
 wp_post :: Int -> IO WP_Post
 wp_post k = do
   the_title <- generate sentence
-  the_date <- generate date
+  the_date <- generate utc_time
   the_content <- generate paragraph
   the_post_type <- generate post_type
   the_is_sticky <- generate is_sticky
   n <- generate $ choose (0::Int,50)
-  the_comments <- wp_comments n
+  the_comments <- wp_comments the_date n
   return WP_Post
     { wp_post_title = the_title
     , wp_post_link = ""
-    , wp_post_pubDate = the_date
+    , wp_post_pubDate = pubDate_format the_date
     , wp_post_creator = ""
     , wp_post_guid = ""
     , wp_post_description = ""
     , wp_post_content_encoded = the_content
     , wp_post_excerpt_encoded = ""
     , wp_post_post_id = show k
-    , wp_post_date = the_date
-    , wp_post_date_gmt = the_date
+    , wp_post_date = post_date_format the_date
+    , wp_post_date_gmt = post_date_format the_date
     , wp_post_comment_status = ""
     , wp_post_name = ""
     , wp_post_status = "publish"
@@ -147,32 +150,32 @@ wp_post k = do
     , wp_post_comments = the_comments
     }
 
-wp_comments :: Int -> IO [WP_Comment]
-wp_comments n = sequence $ map wp_comment [1..n]
+wp_comments :: UTCTime -> Int -> IO [WP_Comment]
+wp_comments time n = sequence $ map (wp_comment time) [1..n]
 
-wp_comment :: Int -> IO WP_Comment
-wp_comment k = do
+wp_comment :: UTCTime -> Int -> IO WP_Comment
+wp_comment time k = do
   the_author <- generate word
   the_author_email <- generate email
   the_author_IP <- generate ip_address
-  the_date <- generate date
+  the_date <- generate $ future_time time
   the_content <- generate paragraph
   the_approved <- generate approved
   the_type <- generate comment_type
-  the_parent <- generate $ fmap show $ choose (0,k-1)
+  the_parent <- generate $ fmap show $ choose (1,k-1)
   return WP_Comment
     { wp_comment_id = show k
     , wp_comment_author = the_author
     , wp_comment_author_url = "example.com"
     , wp_comment_author_email = the_author_email
     , wp_comment_author_IP = the_author_IP
-    , wp_comment_date = the_date
-    , wp_comment_date_gmt = the_date
+    , wp_comment_date = post_date_format the_date
+    , wp_comment_date_gmt = post_date_format the_date
     , wp_comment_content = the_content
     , wp_comment_approved = the_approved
     , wp_comment_type = the_type
     , wp_comment_parent = the_parent
-    , wp_comment_user_id = "0"
+    , wp_comment_user_id = ""
     , wp_comment_metadata = ""
     }
 
@@ -182,9 +185,6 @@ comment_type = frequency
   , (1, return "pingback")
   , (1, return "trackback")
   ]
-
-date :: Gen String
-date = return "2016-10-01 15:31:30"
 
 post_type :: Gen String
 post_type = frequency
@@ -200,8 +200,8 @@ is_sticky = frequency
 
 approved :: Gen String
 approved = frequency
-  [ (199, return "0")
-  , (1, return "1")
+  [ (199, return "1")
+  , (1, return "0")
   ]
 
 ip_address :: Gen String
@@ -392,3 +392,27 @@ header = unlines
   , "  xmlns:wp=\"http://wordpress.org/export/1.2/\""
   , ">\n"
   ]
+
+pubDate_format :: UTCTime -> String
+pubDate_format = formatTime defaultTimeLocale "%a, %d %b %Y %H:%M:%S +0000"
+
+post_date_format :: UTCTime -> String
+post_date_format = formatTime defaultTimeLocale "%Y-%m-%d %H:%M:%S"
+
+utc_time :: Gen UTCTime
+utc_time = do
+  day <- choose (0,2000)
+  sec <- choose (0,86400)
+  return UTCTime
+    { utctDay = ModifiedJulianDay (54750 + day)
+    , utctDayTime = secondsToDiffTime sec
+    }
+
+future_time :: UTCTime -> Gen UTCTime
+future_time x = do
+  offset <- choose (0,10*86400)
+  return $ addUTCTime (fromInteger offset) x
+
+-- <pubDate>Sat, 01 Oct 2016 15:31:30 +0000</pubDate>
+-- <wp:post_date><![CDATA[2016-10-01 15:31:30]]></wp:post_date>
+-- <wp:post_date_gmt><![CDATA[2016-10-01 15:31:30]]></wp:post_date_gmt>
