@@ -9,4 +9,4 @@ Build-Type:     Simple
 Executable prattle
   main-is:        Main.hs
   hs-source-dirs: src/
-  build-depends:  base
+  build-depends:  base, QuickCheck, time

@@ -1,14 +1,200 @@
 module Main where
 
 import Test.QuickCheck
+import Data.Time
+import Data.List
+import System.Environment (getArgs)
 
 main :: IO ()
-main = putStrLn "some junk"
+main = do
+  args <- getArgs
+  n <- case args of
+         [x] -> return (read x)
+         _   -> return 0
+  blog <- wp_blog n
+  putStr (to_xml blog)
+  return ()
+
+class ToXML t where
+  to_xml :: t -> String
+
+data WP_Blog = WP_Blog
+  {  wp_blog_posts :: [WP_Post]
+  } deriving Show
+
+wp_blog :: Int -> IO WP_Blog
+wp_blog n = do
+  the_posts <- wp_posts n
+  return WP_Blog
+    { wp_blog_posts = the_posts
+    }
+
+instance ToXML WP_Blog where
+  to_xml x = unlines
+    [ header
+    , "<channel>"
+    , "<wp:wxr_version>1.2</wp:wxr_version>"
+    , concatMap to_xml (wp_blog_posts x)
+    , "</channel>"
+    , "</rss>"
+    ]
 
 data WP_Post = WP_Post
   { wp_post_title :: String
-  , wp_post_content :: String
-  }
+  , wp_post_link :: String
+  , wp_post_pubDate :: String
+  , wp_post_creator :: String
+  , wp_post_guid :: String
+  , wp_post_description :: String
+  , wp_post_content_encoded :: String
+  , wp_post_excerpt_encoded :: String
+  , wp_post_post_id :: String
+  , wp_post_date :: String
+  , wp_post_date_gmt :: String
+  , wp_post_comment_status :: String
+  , wp_post_name :: String
+  , wp_post_status :: String
+  , wp_post_menu_order :: String
+  , wp_post_type :: String
+  , wp_post_password :: String
+  , wp_post_is_sticky :: String
+  , wp_post_category :: String
+  , wp_post_comments :: [WP_Comment]
+  } deriving Show
+
+instance ToXML WP_Post where
+  to_xml x = unlines
+    [ "<item>"
+    , "  <title>" ++ (wp_post_title x) ++ "</title>"
+    , "  <link>" ++ (wp_post_link x) ++ "</link>"
+    , "  <pubDate>" ++ (wp_post_pubDate x) ++ "</pubDate>"
+    , "  <dc:creator>" ++ cdata (wp_post_creator x) ++ "</dc:creator>"
+    , "  <content:encoded>" ++ cdata (wp_post_content_encoded x) ++ "</content:encoded>"
+    , "  <wp:post_id>" ++ (wp_post_post_id x) ++ "</wp:post_id>"
+    , "  <wp:post_date>" ++ cdata (wp_post_date x) ++ "</wp:post_date>"
+    , concatMap to_xml (wp_post_comments x)
+    , "</item>"
+    ]
+
+data WP_Comment = WP_Comment
+  { wp_comment_id :: String
+  , wp_comment_author :: String
+  , wp_comment_author_email :: String
+  , wp_comment_author_IP :: String
+  , wp_comment_date :: String
+  , wp_comment_date_gmt :: String
+  , wp_comment_content :: String
+  , wp_comment_approved :: String
+  , wp_comment_type :: String
+  , wp_comment_parent :: String
+  , wp_comment_user_id :: String
+  , wp_comment_metadata :: String
+  } deriving Show
+
+instance ToXML WP_Comment where
+  to_xml x = unlines
+    [ "  <wp:comment>"
+    , "    <wp:comment_id>" ++ wp_comment_id x ++ "</wp:comment_id>"
+    , "    <wp_comment_author>" ++ cdata (wp_comment_author x) ++ "</wp:comment_author>"
+    , "    <wp_comment_author_email>" ++ cdata (wp_comment_author_email x) ++ "</wp:comment_author_email>"
+    , "    <wp_comment_author_IP>" ++ cdata (wp_comment_author_IP x) ++ "</wp:comment_author_IP>"
+    , "    <wp_comment_date>" ++ cdata (wp_comment_date x) ++ "</wp:comment_date>"
+    , "    <wp_comment_date_gmt>" ++ cdata (wp_comment_date_gmt x) ++ "</wp:comment_date_gmt>"
+    , "    <wp_comment_content>" ++ cdata (wp_comment_content x) ++ "</wp:comment_content>"
+    , "    <wp_comment_approved>" ++ cdata (wp_comment_approved x) ++ "</wp:comment_approved>"
+    , "    <wp_comment_type>" ++ cdata (wp_comment_type x) ++ "</wp:comment_type>"
+    , "    <wp_comment_parent>" ++ (wp_comment_parent x) ++ "</wp:comment_parent>"
+    , "    <wp_comment_user_id>" ++ (wp_comment_user_id x) ++ "</wp:comment_user_id>"
+    , "  </wp:comment>"
+    ]
+
+wp_posts :: Int -> IO [WP_Post]
+wp_posts n = sequence $ map wp_post [1..n]
+
+wp_post :: Int -> IO WP_Post
+wp_post k = do
+  the_title <- generate sentence
+  the_date <- generate date
+  the_content <- generate paragraph
+  n <- generate $ choose (0::Int,50)
+  the_comments <- wp_comments n
+  return WP_Post
+    { wp_post_title = the_title
+    , wp_post_link = ""
+    , wp_post_pubDate = the_date
+    , wp_post_creator = ""
+    , wp_post_guid = ""
+    , wp_post_description = ""
+    , wp_post_content_encoded = the_content
+    , wp_post_excerpt_encoded = ""
+    , wp_post_post_id = show k
+    , wp_post_date = the_date
+    , wp_post_date_gmt = the_date
+    , wp_post_comment_status = ""
+    , wp_post_name = ""
+    , wp_post_status = ""
+    , wp_post_menu_order = ""
+    , wp_post_type = ""
+    , wp_post_password = ""
+    , wp_post_is_sticky = ""
+    , wp_post_category = ""
+    , wp_post_comments = the_comments
+    }
+
+wp_comments :: Int -> IO [WP_Comment]
+wp_comments n = sequence $ map wp_comment [1..n]
+
+wp_comment :: Int -> IO WP_Comment
+wp_comment k = do
+  the_author <- generate word
+  the_author_email <- generate email
+  the_author_IP <- generate ip_address
+  the_date <- generate date
+  the_content <- generate paragraph
+  the_approved <- generate zero_or_one
+  the_type <- generate comment_type
+  the_parent <- generate $ fmap show $ choose (0,k-1)
+  return WP_Comment
+    { wp_comment_id = show k
+    , wp_comment_author = the_author
+    , wp_comment_author_email = the_author_email
+    , wp_comment_author_IP = the_author_IP
+    , wp_comment_date = the_date
+    , wp_comment_date_gmt = the_date
+    , wp_comment_content = the_content
+    , wp_comment_approved = the_approved
+    , wp_comment_type = the_type
+    , wp_comment_parent = the_parent
+    , wp_comment_user_id = ""
+    , wp_comment_metadata = ""
+    }
+
+comment_type :: Gen String
+comment_type = frequency
+  [ (98, return "")
+  , (1, return "pingback")
+  , (1, return "trackback")
+  ]
+
+date :: Gen String
+date = return ""
+
+ip_address :: Gen String
+ip_address = do
+  oa <- fmap show $ choose (0::Int,255)
+  ob <- fmap show $ choose (0::Int,255)
+  oc <- fmap show $ choose (0::Int,255)
+  od <- fmap show $ choose (0::Int,255)
+  return $ concat
+    [oa, ".", ob, ".", oc, ".", od]
+
+zero_or_one :: Gen String
+zero_or_one = elements ["0", "1"]
+
+email :: Gen String
+email = do
+  name <- word
+  return $ name ++ "@example.com"
 
 paragraph :: Gen String
 paragraph = do
@@ -165,4 +351,19 @@ any_letter = frequency
   , (150, return 'x')
   , (1974, return 'y')
   , (74, return 'z')
+  ]
+
+cdata :: String -> String
+cdata str = "<![CDATA[" ++ str ++ "]]>"
+
+header :: String
+header = unlines
+  [ "<?xml version=\"1.0\" encoding=\"UTF-8\" ?>"
+  , "<rss version=\"2.0\""
+  , "  xmlns:excerpt=\"http://wordpress.org/export/1.2/excerpt/\""
+  , "  xmlns:content=\"http://purl.org/rss/1.0/modules/content/\""
+  , "  xmlns:wfw=\"http://wellformedweb.org/CommentAPI/\""
+  , "  xmlns:dc=\"http://purl.org/dc/elements/1.1/\""
+  , "  xmlns:wp=\"http://wordpress.org/export/1.2/\""
+  , ">\n"
   ]
