@@ -1,0 +1,3 @@
+A tool for generating gibberish WordPress archives for testing.
+
+Once installed, say e.g. ``prattle 100 > export.xml`` to write a WXR file containing 100 posts and pages (as well as comments) to ``export.xml``, ready to be imported.
