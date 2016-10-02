@@ -72,6 +72,8 @@ instance ToXML WP_Post where
     , "  <content:encoded>" ++ cdata (wp_post_content_encoded x) ++ "</content:encoded>"
     , "  <wp:post_id>" ++ (wp_post_post_id x) ++ "</wp:post_id>"
     , "  <wp:post_date>" ++ cdata (wp_post_date x) ++ "</wp:post_date>"
+    , "  <wp:post_type>" ++ cdata (wp_post_type x) ++ "</wp:post_type>"
+    , "  <wp:status>" ++ cdata (wp_post_status x) ++ "</wp:status>"
     , concatMap to_xml (wp_post_comments x)
     , "</item>"
     ]
@@ -80,6 +82,7 @@ data WP_Comment = WP_Comment
   { wp_comment_id :: String
   , wp_comment_author :: String
   , wp_comment_author_email :: String
+  , wp_comment_author_url :: String
   , wp_comment_author_IP :: String
   , wp_comment_date :: String
   , wp_comment_date_gmt :: String
@@ -96,6 +99,7 @@ instance ToXML WP_Comment where
     [ "  <wp:comment>"
     , "    <wp:comment_id>" ++ wp_comment_id x ++ "</wp:comment_id>"
     , "    <wp_comment_author>" ++ cdata (wp_comment_author x) ++ "</wp:comment_author>"
+    , "    <wp_comment_author_url>" ++ cdata (wp_comment_author_url x) ++ "</wp:comment_author_url>"
     , "    <wp_comment_author_email>" ++ cdata (wp_comment_author_email x) ++ "</wp:comment_author_email>"
     , "    <wp_comment_author_IP>" ++ cdata (wp_comment_author_IP x) ++ "</wp:comment_author_IP>"
     , "    <wp_comment_date>" ++ cdata (wp_comment_date x) ++ "</wp:comment_date>"
@@ -116,6 +120,8 @@ wp_post k = do
   the_title <- generate sentence
   the_date <- generate date
   the_content <- generate paragraph
+  the_post_type <- generate post_type
+  the_is_sticky <- generate is_sticky
   n <- generate $ choose (0::Int,50)
   the_comments <- wp_comments n
   return WP_Post
@@ -132,11 +138,11 @@ wp_post k = do
     , wp_post_date_gmt = the_date
     , wp_post_comment_status = ""
     , wp_post_name = ""
-    , wp_post_status = ""
+    , wp_post_status = "publish"
     , wp_post_menu_order = ""
-    , wp_post_type = ""
+    , wp_post_type = the_post_type
     , wp_post_password = ""
-    , wp_post_is_sticky = ""
+    , wp_post_is_sticky = the_is_sticky
     , wp_post_category = ""
     , wp_post_comments = the_comments
     }
@@ -151,12 +157,13 @@ wp_comment k = do
   the_author_IP <- generate ip_address
   the_date <- generate date
   the_content <- generate paragraph
-  the_approved <- generate zero_or_one
+  the_approved <- generate approved
   the_type <- generate comment_type
   the_parent <- generate $ fmap show $ choose (0,k-1)
   return WP_Comment
     { wp_comment_id = show k
     , wp_comment_author = the_author
+    , wp_comment_author_url = "example.com"
     , wp_comment_author_email = the_author_email
     , wp_comment_author_IP = the_author_IP
     , wp_comment_date = the_date
@@ -165,7 +172,7 @@ wp_comment k = do
     , wp_comment_approved = the_approved
     , wp_comment_type = the_type
     , wp_comment_parent = the_parent
-    , wp_comment_user_id = ""
+    , wp_comment_user_id = "0"
     , wp_comment_metadata = ""
     }
 
@@ -177,7 +184,25 @@ comment_type = frequency
   ]
 
 date :: Gen String
-date = return ""
+date = return "2016-10-01 15:31:30"
+
+post_type :: Gen String
+post_type = frequency
+  [ (95, return "post")
+  , (5, return "page")
+  ]
+
+is_sticky :: Gen String
+is_sticky = frequency
+  [ (199, return "0")
+  , (1, return "1")
+  ]
+
+approved :: Gen String
+approved = frequency
+  [ (199, return "0")
+  , (1, return "1")
+  ]
 
 ip_address :: Gen String
 ip_address = do
